@@ -1,0 +1,10 @@
+{
+
+    "raptor": {
+        "url": "http://raptor.local",
+        "username": "=============Put username here=============",
+        "password": "=============Put password here============="
+    },
+    
+    "logLevel": "debug"
+}
