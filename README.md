@@ -1,11 +1,11 @@
-# Raptor-tutorial
+# Raptor-tutorial-js
 Tutorial for Raptorbox - an open-source lightweight IoT platform 
 
 ## Pre-requisites
 
 1. [Raptor](https://github.com/raptorbox/raptor) 
 (Check the [Getting Started](https://github.com/raptorbox/raptor#getting-started) to set it up)
-2. [Nodejs](https://nodejs.org/en/). (See Nodejs offical docs for installation)  
+2. [Nodejs](https://nodejs.org/en/) (See Nodejs offical docs for installation)  
 
 ### Installation
 1. Clone the project.
