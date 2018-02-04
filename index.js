@@ -114,9 +114,10 @@ const updateDevice = (device) => {
 const listDevices = () => {
  
     return raptor.Inventory().list()
-    .then((devices) => {
+    .then((pager) => {
+        let devices = pager.getContent()
         if(devices){
-            // log.debug('total devices: %d', devices.length)
+            log.debug('total devices: %d', devices.length)
         }
     })
 
@@ -128,8 +129,11 @@ const searchDeviceByName = () => {
             name: { contains: 'test' }
         }
     return raptor.Inventory().search(query)
-    .then((list) => {
-        log.debug(list)
+    .then((pager) => {
+        let devices = pager.getContent()
+        if(devices){
+            log.debug(devices)
+        }
     })
 
 }
@@ -140,8 +144,11 @@ const searchDeviceByUserId = (userId) => {
             properties: {userId}
         }
     return raptor.Inventory().search(query)
-    .then((list) => {
-        log.debug(list)
+    .then((pager) => {
+        let devices = pager.getContent()
+        if(devices){
+            log.debug(devices)
+        }
     })
     
 }
@@ -201,6 +208,83 @@ const pushData = (device, maxCounter) => {
                     reject(e)
                 })
         }, 1500)
+    })
+}
+
+const randomName = (prefix) => {
+    prefix = prefix || ''
+    const rnd = Math.round(Math.random() * Date.now())
+    return `user_${rnd}`
+}
+
+const newUser = (username) => {
+    username = username || randomName()
+    const u = new Raptor.models.User()
+    u.username = username
+    u.password = 'passwd_' + u.username
+    u.email = u.username + '@test.raptor.local'
+    u.roles = ['user']
+    return raptor.Admin().User().create(u)
+}
+
+const app = () => {
+    const users = [
+        newUser(),
+        newUser(),
+    ]
+    return Promise.all(users).then((ops) => {
+
+        const
+            u1 = ops[0],
+            u2 = ops[1],
+            u1id = u1.id,
+            u2id = u2.id
+
+        return raptor.App().create({
+            name: 'app',
+            roles: [{name: 'role1', permissions: ['admin_device']}, {name: 'role2', permissions: ['read_user']}],
+            users: [
+                { id: u1id, roles: ['role1', 'role2'] },
+                { id: u2id, roles: ['role2'] },
+            ]
+        }).then((app) => {
+            log.debug('Application (name) %s (id= %s) created', app.name, app.id)
+            return Promise.all([
+                raptor.Inventory().create({ name: 'dev1', domain: app.id }),
+                raptor.Inventory().create({ name: 'dev2', domain: app.id })
+            ]).then((res) => {
+                log.debug('Devices created and added to app')
+                const  dev1 = res[0],
+                    dev2 = res[1]
+
+                return Promise.resolve(app)
+            })
+        }).then((res) => {
+            return raptor.App().read(res).then((app) => {
+                log.debug('Application (name) %s (id= %s) loaded', app.name, app.id)
+                return app
+            })
+        }).then((app) => {
+            let users = app.users
+            let roles = app.roles
+            let name = app.name
+            app.users = [{id: users[0].id, roles: users[0].roles}]
+            app.roles.push({name: 'role3', permissions: ['admin_own_device','admin_own_user']})
+            return raptor.App().update(app).then((resApp) => {
+                log.debug('Application (name) %s (id= %s) updated', resApp.name, resApp.id)
+                return resApp
+            })
+        }).then((app) => {
+            return raptor.App().delete(app).then(() => {
+                log.debug('App deleted')
+                return Promise.resolve()
+            })
+        }).then((app) => {
+            return raptor.App().list().then((pager) => {
+                log.debug('Apps available %s', pager.getTotalElements())
+                return Promise.resolve()
+            })
+        })
     })
 }
 
@@ -270,6 +354,10 @@ const main = () => {
         .then((device) => {
             log.debug('Pulling last update of stream')
             return pullLastUpdate(device)
+        })
+        .then(() => {
+            log.debug('Application example')
+            return app()
         })
         .then(() => {
             log.info('Closing')
