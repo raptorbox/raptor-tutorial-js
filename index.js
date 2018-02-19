@@ -123,17 +123,18 @@ const listDevices = () => {
 
 }
 
-const searchDeviceByName = () => {
+const searchDeviceByName = (name) => {
 
     let query = {
-            name: { contains: 'test' }
+            name: { contains: name }
         }
     return raptor.Inventory().search(query)
     .then((pager) => {
         let devices = pager.getContent()
         if(devices){
-            log.debug(devices)
+            log.debug("Devices found: %d", pager.getTotalElements())
         }
+        return devices[0]
     })
 
 }
@@ -141,14 +142,29 @@ const searchDeviceByName = () => {
 const searchDeviceByUserId = (userId) => {
 
     let query = {
-            properties: {userId}
+            userId: userId
         }
     return raptor.Inventory().search(query)
     .then((pager) => {
         let devices = pager.getContent()
         if(devices){
-            log.debug(devices)
+            log.debug("Devices found: %d", pager.getTotalElements())
         }
+        return devices[0]
+    })
+    
+}
+
+const pullUpdate = (device) => {
+
+    let stream = device.getStream('test_stream')
+
+    return raptor.Stream().list(stream)
+    .then((pager) => {
+        let records = pager.getContent()
+        log.debug(records.length)
+        // log.debug(JSON.stringify(records))
+        return device
     })
     
 }
@@ -227,6 +243,26 @@ const newUser = (username) => {
     return raptor.Admin().User().create(u)
 }
 
+const newUserWithOwnerId = (username, ownerId) => {
+    username = username || randomName()
+    const u = new Raptor.models.User()
+    u.username = username
+    u.password = 'passwd_' + u.username
+    u.email = u.username + '@test.raptor.local'
+    u.ownerId = ownerId
+    return raptor.Admin().User().create(u)
+}
+
+const searchAndDeleteUser = (username) => {
+    return raptor.Admin().User().list({username: username})
+    .then((user) => {
+        // log.debug(user)
+        user.getContent().forEach((u) => {
+            return Promise.resolve(raptor.Admin().User().delete(u.id))
+        })
+    })
+}
+
 const app = () => {
     const users = [
         newUser(),
@@ -275,9 +311,16 @@ const app = () => {
                 return resApp
             })
         }).then((app) => {
-            return raptor.App().delete(app).then(() => {
-                log.debug('App deleted')
-                return Promise.resolve()
+            log.debug('App user\'s deleted')
+            return Promise.resolve(raptor.Admin().User().delete(u1id))
+            .then(() => {
+                return raptor.Admin().User().delete(u2id)
+            })
+            .then(() => {
+                return raptor.App().delete(app).then(() => {
+                    log.debug('App deleted')
+                    return Promise.resolve()
+                })
             })
         }).then((app) => {
             return raptor.App().list().then((pager) => {
@@ -295,43 +338,47 @@ const main = () => {
     }
 
     let userid = ''
+    let device = null
 
     raptor.Auth().login()
         .then((user) => {
             log.debug(user)
-            log.debug('Logged in as %s (id=%s)', user.username, user.uuid)
-            userid = user.uuid
+            log.debug('Logged in as %s (id=%s)', user.username, user.id)
+            userid = user.id
             return loadDevice(code)
+            // return Promise.resolve(true)
         })
-        .then((device) => {
+        .then((d) => {
+            device = d
             log.debug('Got device `%s`, subscribing to data', device.id)
             return subscribe(device)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Got device `%s`, subscribing to device events', device.id)
             return subscribeEvents(device)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Pushing data to device `%s`', device.id)
             return pushData(device, 10)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Adding stream to device `%s`', device.id)
             return addStream(device)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Adding channels to new stream of device `%s`', device.id)
             return addChannelsToStream(device)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Update stream of device `%s`', device.id)
             return updateStream(device)
         })
-        .then((device) => {
+        .then(() => {
             log.debug('Update device `%s`', device.id)
             return updateDevice(device)
         })
-        .then((device) => {
+        .then((d) => {
+            device = d 
             log.debug('Unsubscribing device `%s`', device.id)
             return raptor.Inventory().unsubscribe(device)
         })
@@ -344,16 +391,28 @@ const main = () => {
             return listDevices()
         })
         .then(() => {
-            log.debug('Search device by name')
-            return searchDeviceByName()
-        })
-        .then(() => {
             log.debug('Search device by user id %s', userid)
             return searchDeviceByUserId(userid)
         })
-        .then((device) => {
+        .then(() => {
+            log.debug('Search device by name')
+            return searchDeviceByName(device.name)
+        })
+        .then(() => {
+            log.debug('Pulling last update of stream')
+            return pullUpdate(device)
+        })
+        .then(() => {
             log.debug('Pulling last update of stream')
             return pullLastUpdate(device)
+        })
+        .then(() => {
+            log.debug('Creating user with owner id')
+            return newUserWithOwnerId('user_with_owner', userid)
+        })
+        .then(() => {
+            log.debug('Deleting user')
+            return searchAndDeleteUser('user_with_owner')
         })
         .then(() => {
             log.debug('Application example')
