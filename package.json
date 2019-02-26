@@ -17,11 +17,11 @@
   },
   "homepage": "https://github.com/raptorbox/raptor-tutorial-js#readme",
   "dependencies": {
-    "bluebird": "^3.5.1",
-    "raptor-sdk": "^4.3.41",
-    "winston": "^2.4.0"
+    "bluebird": "^3.5.3",
+    "raptor-sdk": "^5.0.42",
+    "winston": "^2.4.4"
   },
   "devDependencies": {
-    "eslint": "^4.8.0"
+    "eslint": "^4.19.1"
   }
 }

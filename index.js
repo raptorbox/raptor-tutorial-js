@@ -83,7 +83,7 @@ const addChannelsToStream = (device) => {
     })
 
     return raptor.Inventory().update(device)
-    
+
 }
 
 const updateStream = (device) => {
@@ -96,7 +96,7 @@ const updateStream = (device) => {
             'updated': 'boolean'
         }
     })
-    
+
     return raptor.Inventory().update(device)
 
 }
@@ -108,15 +108,15 @@ const updateDevice = (device) => {
     device.properties = {'foo':'bar'}
 
     return raptor.Inventory().update(device)
-    
+
 }
 
 const listDevices = () => {
- 
+
     return raptor.Inventory().list()
-    .then((devices) => {
-        if(devices){
-            // log.debug('total devices: %d', devices.length)
+    .then((pager) => {
+        if(pager){
+            log.debug('total devices: %d', pager.json.totalElements)
         }
     })
 
@@ -128,8 +128,8 @@ const searchDeviceByName = () => {
             name: { contains: 'test' }
         }
     return raptor.Inventory().search(query)
-    .then((list) => {
-        log.debug(list)
+    .then((pager) => {
+        log.debug('total devices: %d', pager.json.totalElements)
     })
 
 }
@@ -140,10 +140,10 @@ const searchDeviceByUserId = (userId) => {
             properties: {userId}
         }
     return raptor.Inventory().search(query)
-    .then((list) => {
-        log.debug(list)
+    .then((pager) => {
+        log.debug('total devices: %d', pager.json.totalElements)
     })
-    
+
 }
 
 const pullLastUpdate = (device) => {
@@ -152,9 +152,9 @@ const pullLastUpdate = (device) => {
 
     return raptor.Stream().lastUpdate(stream)
     .then((record) => {
-        log.debug(JSON.stringify(record))
-    })
-    
+        console.log('pullLastUpdate: ', record)
+    }).then(()=> Promise.resolve(device))
+
 }
 
 const subscribe = (device) => {
@@ -232,6 +232,10 @@ const main = () => {
             return pushData(device, 10)
         })
         .then((device) => {
+            log.debug('Pulling last update of stream')
+            return pullLastUpdate(device)
+        })
+        .then((device) => {
             log.debug('Adding stream to device `%s`', device.id)
             return addStream(device)
         })
@@ -266,10 +270,6 @@ const main = () => {
         .then(() => {
             log.debug('Search device by user id %s', userid)
             return searchDeviceByUserId(userid)
-        })
-        .then((device) => {
-            log.debug('Pulling last update of stream')
-            return pullLastUpdate(device)
         })
         .then(() => {
             log.info('Closing')
